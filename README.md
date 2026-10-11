@@ -9,7 +9,9 @@ pi -e ./index.ts
 
 ## Interface
 
-`/cost now`, `task TASK-ID`, `project --last 30d`, `compare PROVIDER/MODEL PROVIDER/MODEL`, `budget task|session|project 0.50 USD`, `export --format json|csv --scope current-project`, `reconcile billing.json`.
+`/cost now`,` task TASK-ID`,` project --last 30d`,` compare PROVIDER/MODEL PROVIDER/MODEL`,` budget task|session|project 0.50 USD`,` export --format json|csv --scope current-project`,` reconcile billing.json`,` help`.
+
+Autocomplete de argumentos nativo: `task` mostra os IDs de tarefa gravados para este repositório (mais recentes primeiro), `compare` mostra os modelos efetivamente vistos com nº de chamadas e custo conhecido, `budget` explica o que cada escopo limita e sugere valores, `project --last` oferece 7d/30d/90d, `export --format` oferece json|csv. `/cost` sem argumento dá o resumo da sessão; um comando errado devolve a gramática.
 
 O tag de tarefa é compartilhado no branch com o gate. Sem tarefa: `unattributed`. Reconcile importa `[{"providerRequestId":"id","observedCostUsd":0.05}]` após confirmação humana, preservando estimativa e snapshot histórico. Export é agregado sem prompts/credenciais; custo estimado nunca é apresentado como fatura.
 
@@ -23,12 +25,12 @@ Custos reportados no stream e importados por reconcile têm precedência sobre e
 
 ## Orçamentos
 
-Soft: avisos deduplicados em 50/80/100%. Hard: reserva atômica antes do dispatch, incluindo requisições simultâneas; todos os limites aplicáveis compõem, de modo que um task limite folgado não relaxa project/locked. Preço desconhecido com hard limit falha fechado. Com limite hard, o cap preventivo de saída é `maxRequestOutputTokens` (padrão 2048); pode ser configurado conscientemente. Sem limite hard, a observabilidade não modifica o limite nativo de saída (a menos que `capOutput: true` seja explicitamente solicitado). Falha de storage informativo preserva a resposta e avisa cobertura incompleta; política financeira/auditoria obrigatória falha fechado. Estimativa de input é aproximada e rotulada.
+Soft: avisos deduplicados em 50/80/100%. Hard: reserva atômica antes do dispatch, incluindo requisições simultâneas; todos os limites aplicáveis compõem, de modo que um task limite folgado não relaxa project/locked. Preço desconhecido com hard limit falha fechado. Com limite hard, o cap preventivo de saída é `maxRequestOutputTokens` (padrão 2048); pode ser configurado conscientemente. Sem limite hard, a observabilidade não modifica o limite nativo de saída (a menos que` capOutput: true` seja explicitamente solicitado). Falha de storage informativo preserva a resposta e avisa cobertura incompleta; política financeira/auditoria obrigatória falha fechado. Estimativa de input é aproximada e rotulada.
 
 Não promete parar faturamento remoto iniciado nem controlar chamadas fora do Pi. Outro plugin com as mesmas permissões pode substituir provedores; uma política financeira organizacional rígida requer gateway/SO. Ao desligar a extensão, seus wrappers são removidos e o provedor anterior é restaurado.
 
 ## Arquivos e testes
 
-`model-calls`, `pricing-snapshots`, `tool-calls`, `tasks`, `outcomes`, `model-routes`, `gate-receipts`, `budgets`, `reservations`, `reconciliations`, `audit`: arquivos JSONL, nenhum SQL/driver/banco. Esquema versionado, lock de escritor, fsync e exports por rename atômico. Lock/reserva interrompidos por queda exigem inspeção/recuperação manual: não são apagados automaticamente para relaxar limites.
+`model-calls`,` pricing-snapshots`,` tool-calls`,` tasks`,` outcomes`,` model-routes`,` gate-receipts`,` budgets`,` reservations`,` reconciliations`,` audit`: arquivos JSONL, nenhum SQL/driver/banco. Esquema versionado, lock de escritor, fsync e exports por rename atômico. Lock/reserva interrompidos por queda exigem inspeção/recuperação manual: não são apagados automaticamente para relaxar limites.
 
-`npm test` valida cache, billing precedence, coortes, dedup, todos os limites e bloqueio antes de dispatch com provedor fake. Provedores externos não foram cobrados nos testes. Instalar/remover: `pi install ./pi-cost-profiler` / `pi remove ./pi-cost-profiler`.
+`npm test` valida cache, billing precedence, coortes, dedup, todos os limites e bloqueio antes de dispatch com provedor fake. Provedores externos não foram cobrados nos testes. Instalar/remover:` pi install ./pi-cost-profiler` /` pi remove ./pi-cost-profiler`.

@@ -3,6 +3,8 @@ import {
   scopeOf,
   setTask,
   output,
+  usageText,
+  buildCompletions,
   words,
   uid,
   now,
@@ -659,17 +661,134 @@ export default function profiler(pi, makeStream) {
     wrapped.clear();
     await rt.dispose();
   });
+  const LEVELS = [
+    { value: 'task', description: 'cap the selected task' },
+    { value: 'session', description: 'cap this session only' },
+    { value: 'project', description: 'cap everything in this repository' },
+  ];
+  const LEVEL_IDS = LEVELS.map((l) => l.value);
+  const WINDOWS = [
+    { value: '7d', description: 'last week' },
+    { value: '30d', description: 'last month (default)' },
+    { value: '90d', description: 'last quarter' },
+  ];
+  const WINDOW_IDS = WINDOWS.map((w) => w.value);
+  /** Task IDs with recorded spend, most recent first. */
+  const knownTasks = async () => {
+    try {
+      const rows = await rt.store.rows('tasks');
+      const seen = new Map();
+      for (const r of rows)
+        if (r.taskId && !seen.has(r.taskId)) seen.set(r.taskId, r.occurredAt ?? '');
+      return [...seen.entries()]
+        .sort((a, b) => (a[1] < b[1] ? 1 : -1))
+        .slice(0, 40)
+        .map(([id, at]) => ({ value: id, label: id, description: at ? at.slice(0, 10) : '' }));
+    } catch {
+      return [];
+    }
+  };
+  /** Models actually seen in this project, for `compare`. */
+  const knownModels = async () => {
+    try {
+      const calls = await allCalls();
+      const seen = new Map();
+      for (const c of calls) {
+        if (!c.modelId) continue;
+        const prev = seen.get(c.modelId) ?? { usd: 0, n: 0 };
+        seen.set(c.modelId, {
+          usd: prev.usd + Number(c.estimatedCostUsd ?? c.observedCostUsd ?? 0),
+          n: prev.n + 1,
+        });
+      }
+      return [...seen.entries()]
+        .sort((a, b) => b[1].n - a[1].n)
+        .slice(0, 40)
+        .map(([id, s]) => ({
+          value: id,
+          label: id,
+          description: `${s.n} call(s) · $${s.usd.toFixed(4)} known`,
+        }));
+    } catch {
+      return [];
+    }
+  };
+  const costSpec = {
+    name: 'cost',
+    description: 'Cost accounting, budgets and exports per task/project',
+    actions: {
+      now: { hint: '', description: 'this session spend and coverage' },
+      task: {
+        hint: 'TASK-ID',
+        description: 'select a task and report its spend',
+        args: [{ provide: knownTasks, hint: 'task id' }],
+      },
+      project: {
+        hint: '[--last Nd]',
+        description: 'project window totals',
+        flags: {
+          '--last': {
+            values: WINDOWS,
+            hint: '7d|30d|90d',
+          },
+        },
+      },
+      compare: {
+        hint: 'MODEL MODEL [--kind K]',
+        description: 'cost/acceptance per model cohort',
+        args: [{ provide: knownModels, hint: 'provider/model', advance: true }, { provide: knownModels, hint: 'provider/model' }],
+        flags: { '--kind': { hint: 'request kind' } },
+      },
+      budget: {
+        hint: 'LEVEL N USD',
+        description: 'set a limit (warn 50/80/100%)',
+        args: [
+          { values: LEVELS, hint: 'level', advance: true },
+          {
+            values: ['0.50', '1.00', '5.00', '20.00'].map((v) => ({
+              value: v,
+              description: 'hard cap, warns at 50/80%',
+            })),
+            hint: 'amount',
+            advance: true,
+          },
+          { values: [{ value: 'USD', description: 'only USD is supported' }], hint: 'USD' },
+        ],
+      },
+      export: {
+        hint: '[--format json|csv] [--raw]',
+        description: 'aggregate report, no prompts or credentials',
+        flags: {
+          '--format': { values: ['json', 'csv'], hint: 'json|csv' },
+          '--raw': { hint: 'redacted audit records (json only, confirmed)' },
+        },
+      },
+      reconcile: {
+        hint: 'BILLING.json',
+        description: 'import observed costs after confirmation',
+        args: [{ hint: 'path to [{providerRequestId,observedCostUsd}]' }],
+      },
+      help: { hint: '', description: 'show this list' },
+    },
+  };
   pi.registerCommand('cost', {
-    description: 'Costs: now | task ID | project --last Nd | compare | budget | export | reconcile',
+    description: 'Costs — now | task ID | project | compare | budget | export | reconcile | help',
+    getArgumentCompletions: buildCompletions(costSpec),
     handler: async (args, ctx) => {
       await rt.init(ctx);
       const [action = 'now', ...rest] = words(args);
+      if (action === 'help') return output(ctx, usageText('cost', costSpec));
       let calls = await allCalls(),
         tasks = await rt.store.rows('tasks'),
         tools = await rt.store.rows('tool-calls');
       const scope = scopeOf(ctx);
       if (action === 'task') {
-        if (!rest[0]) throw Error('Task ID required');
+        if (!rest[0]) {
+          const ids = await knownTasks();
+          throw Error(
+            `task needs a TASK-ID.${ids.length ? ` Known: ${ids.slice(0, 8).map((i) => i.value).join(', ')}${ids.length > 8 ? ` (+${ids.length - 8})` : ''}` : ' No tasks recorded yet in this project.'}`,
+          );
+        }
         setTask(pi, rest[0]);
         calls = calls.filter((r) => r.taskId === rest[0]);
         tasks = tasks.filter((t) => t.taskId === rest[0]);
@@ -680,7 +799,10 @@ export default function profiler(pi, makeStream) {
       } else if (action === 'project') {
         const at = rest.indexOf('--last'),
           duration = rest[at + 1] ?? '30d';
-        if (!/^\d+d$/.test(duration)) throw Error('Window requires Nd');
+        if (!/^\d+d$/.test(duration))
+          throw Error(
+            `--last needs a day window like 7d or ${WINDOW_IDS.join('/')} (got "${duration}")`,
+          );
         const since = Date.now() - Number(duration.slice(0, -1)) * 86400000;
         calls = calls.filter((r) => Date.parse(r.occurredAt) >= since);
       } else if (action === 'budget') {
@@ -689,12 +811,14 @@ export default function profiler(pi, makeStream) {
           throw Error('Select a task with /cost task ID first');
         const n = Number(amount);
         if (
-          !['task', 'session', 'project'].includes(level) ||
+          !LEVEL_IDS.includes(level) ||
           !Number.isFinite(n) ||
           n <= 0 ||
           currency !== 'USD'
         )
-          throw Error('budget task|session|project N USD');
+          throw Error(
+            `Usage: /cost budget ${LEVEL_IDS.join('|')} <amount> USD — for example: /cost budget task 0.50 USD`,
+          );
         await rt.store.append('budgets', {
           id: uid(),
           scope: level,
@@ -707,9 +831,16 @@ export default function profiler(pi, makeStream) {
         return output(ctx, { scope: level, hardUsd: n });
       } else if (action === 'compare') {
         const at = rest.indexOf('--kind');
+        const models = rest.slice(0, 2);
+        if (!models.length) {
+          const known = await knownModels();
+          throw Error(
+            `compare needs one or two models.${known.length ? ` Seen: ${known.slice(0, 6).map((m) => m.value).join(', ')}` : ' No model calls recorded yet in this project.'}`,
+          );
+        }
         return output(
           ctx,
-          rest.slice(0, 2).map((model) => {
+          models.map((model) => {
             const rows = calls.filter(
               (r) => r.modelId === model && (at < 0 || r.kind === rest[at + 1]),
             );
@@ -725,7 +856,10 @@ export default function profiler(pi, makeStream) {
           }),
         );
       } else if (action === 'reconcile') {
-        if (!rest[0]) throw Error('reconcile PATH to [{providerRequestId,observedCostUsd}]');
+        if (!rest[0])
+          throw Error(
+            'reconcile needs a PATH to a JSON array of [{providerRequestId,observedCostUsd}] — export one from your billing provider.',
+          );
         const rows = JSON.parse(
           await readFile(await safePath(rt.root, rest[0], { existing: true }), 'utf8'),
         );
@@ -784,7 +918,7 @@ export default function profiler(pi, makeStream) {
             { mode: 0o600 },
           );
         return output(ctx, { export: file, scope: 'current-project' });
-      } else throw Error('Unknown /cost command');
+      } else throw Error(`Unknown /cost ${action}\n${usageText('cost', costSpec)}`);
       const rec = await rt.store.rows('reconciliations');
       calls = calls.map((c) => {
         const r = rec.filter((r) => r.providerRequestId === c.providerRequestId).at(-1);
