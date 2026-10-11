@@ -34,3 +34,4 @@ Não promete parar faturamento remoto iniciado nem controlar chamadas fora do Pi
 `model-calls`,` pricing-snapshots`,` tool-calls`,` tasks`,` outcomes`,` model-routes`,` gate-receipts`,` budgets`,` reservations`,` reconciliations`,` audit`: arquivos JSONL, nenhum SQL/driver/banco. Esquema versionado, lock de escritor, fsync e exports por rename atômico. Lock/reserva interrompidos por queda exigem inspeção/recuperação manual: não são apagados automaticamente para relaxar limites.
 
 `npm test` valida cache, billing precedence, coortes, dedup, todos os limites e bloqueio antes de dispatch com provedor fake. Provedores externos não foram cobrados nos testes. Instalar/remover:` pi install ./pi-cost-profiler` /` pi remove ./pi-cost-profiler`.
+# pi-cost-profiler
