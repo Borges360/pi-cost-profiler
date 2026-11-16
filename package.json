@@ -1,6 +1,6 @@
 {
   "name": "pi-cost-profiler",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,9 +9,22 @@
   "keywords": [
     "pi-package"
   ],
+  "files": [
+    "README.md",
+    "index.ts",
+    "extension.mjs",
+    "menu.mjs",
+    "ledger.mjs",
+    "lib/",
+    "scripts/",
+    "test/",
+    "test-support/",
+    "docs/assets/"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-ai": "*"
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-tui": "*"
   },
   "dependencies": {
     "yaml": "2.8.2"
@@ -22,6 +35,7 @@
     ]
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "smoke": "node scripts/smoke-panel.mjs"
   }
 }

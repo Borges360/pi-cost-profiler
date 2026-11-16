@@ -124,6 +124,8 @@ test('native provider wrapper preserves stream and prevents dispatch before hard
     assert.equal(result.stopReason, 'error');
     assert.equal(dispatch, 1);
     assert.match(result.errorMessage, /denied/);
+    assert.match(result.errorMessage, /Review \/cost before retrying/);
+    assert.match(result.errorMessage, /No limit is changed automatically/);
     await f.emit('session_shutdown');
   } finally {
     if (old === undefined) delete process.env.PI_SUITE_HOME;
