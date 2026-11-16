@@ -1,0 +1,6 @@
+schema: harness/skill-metadata/v1
+id: pi-cost-profiler
+version: 1.0.0
+owner: pi-cost-profiler
+source: "README.md, AGENTS.md, package.json, extension.mjs, index.ts, menu.mjs, ledger.mjs, lib/core.mjs"
+scope: "product-local; Pi, Codex and Cursor"
