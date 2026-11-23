@@ -4,7 +4,7 @@ Local cost accounting and budget controls for Pi model calls, organized by sessi
 
 **Manifest:** pi-cost-profiler · **version:** 0.3.0
 **Status:** The manifest is private. Registry availability and publication have not been verified; CT59 owns any publication decision. This README does not claim a registry install path.
-**Compatibility:** Node.js >=20; Pi peer packages are declared as *. The real-host smoke was verified on Pi 1.4.0; that check is not a compatibility matrix.
+**Compatibility:** Node.js >=22.19 (required by pi-tui 1.6.0); Pi peer packages are declared as >=1.5.2 <1.7.0. The real-host smoke (`npm run smoke`) was run against the installed Pi 1.6.0; that check is not a compatibility matrix.
 
 ## English
 
@@ -27,7 +27,14 @@ The package is private and registry publication is unverified. Do not assume a r
 
 ### Use
 
-In a Pi TUI, /cost with no arguments opens the dashboard. In a client without custom-screen support, it prints a summary and the direct command forms. Dashboard edits remain a draft until Ctrl+S validates and saves them. Esc returns from a submenu; at the root, it warns about a draft and a second Esc discards it. A failed save keeps the draft available for another attempt.
+In a Pi TUI, /cost with no arguments opens the settings panel at once; spend, price coverage and active limits fill in as soon as the local ledger is read. In a client without custom-screen support, it prints a summary and the direct command forms.
+
+- ↑/↓ move, Enter edits a value or runs a row (Enter on a yes/no setting switches it), Space toggles a local model, / searches the rows, Tab reaches [Save changes] [Help] [Close].
+- Edits stay a draft (the title shows `*`) until Ctrl+S validates and saves them; the panel stays open after saving.
+- Esc in a field or list goes back without applying it. At the root, Esc with a draft warns, and a second Esc discards the changes and closes.
+- Esc during a save or a refresh cancels it. A failed or cancelled save keeps the draft for another Ctrl+S; if a save cannot be confirmed, Ctrl+S (or [Check storage]) rereads the stored settings before writing again.
+- Budgets are one setting per level (project, task, session): No limit or a hard amount, with the soft warning at 80%. Values set outside the panel stay selectable.
+- Settings locked by the global policy show `[source: global policy]` and are never written by the panel.
 
 ~~~text
 /cost now
@@ -77,12 +84,12 @@ The extension stores its ledger and project configuration locally. It does not s
 
 - If totals show an unknown price, check the model's pricing metadata or add a confirmed local model with /cost local add provider/model; unknown values are not treated as free.
 - If project settings are not applied, verify that Pi trusts the project and inspect .pi/pi-suite.yaml plus any global locked settings.
-- Run npm test for the unit suite and npm run smoke for the panel smoke. The smoke uses synthetic ledger/state data with Pi's local loader and TUI; it does not call a model or provider. The accepted CT52 smoke used Pi 1.4.0.
+- Run npm test for the unit suite and npm run smoke for the panel smoke. The smoke stages an installed copy of the package, loads it with the loader of the installed Pi release (default ~/.pi/agent/install/releases/1.6.0, or PI_HOST_DIR) and drives the panel with that release's pi-tui; it uses synthetic ledger/state data in temporary directories and does not call a model or provider. It does not replace a manual check in a real terminal.
 - The extension cannot cancel provider billing already in progress or govern calls made by other extensions.
 
 ### License
 
-The repository does not currently specify a license for the product code.
+The repository does not currently specify a license for the product code. Third-party code in vendor/ keeps its own license; see vendor/THIRD_PARTY_NOTICES.md.
 
 ## Português (Brasil)
 
@@ -105,7 +112,14 @@ O pacote está privado e a publicação no registry não foi verificada. Não pr
 
 ### Uso
 
-Na TUI do Pi, /cost sem argumentos abre o painel. Em clientes sem suporte a tela customizada, mostra um resumo e os formatos dos comandos diretos. As edições ficam em rascunho até Ctrl+S validar e salvar. Esc volta do submenu; na tela inicial, avisa sobre o rascunho e uma segunda pressão descarta as mudanças. Se o salvamento falhar, o rascunho fica disponível para nova tentativa.
+Na TUI do Pi, /cost sem argumentos abre o painel de configurações na hora; gasto, cobertura de preços e limites ativos aparecem assim que o ledger local é lido. Em clientes sem suporte a tela customizada, mostra um resumo e os formatos dos comandos diretos.
+
+- ↑/↓ movem, Enter edita um valor ou executa uma linha (Enter numa opção sim/não alterna), Espaço marca um modelo local, / busca linhas, Tab leva a [Salvar alterações] [Ajuda] [Fechar].
+- As edições ficam em rascunho (o título mostra `*`) até Ctrl+S validar e salvar; o painel continua aberto depois de salvar.
+- Esc num campo ou lista volta sem aplicar. Na tela inicial, Esc com rascunho avisa e um segundo Esc descarta as mudanças e fecha.
+- Esc durante um salvamento ou uma atualização cancela a operação. Salvamento com falha ou cancelado mantém o rascunho para outro Ctrl+S; se o salvamento não puder ser confirmado, Ctrl+S (ou [Conferir armazenamento]) relê a configuração gravada antes de gravar de novo.
+- Os orçamentos são uma opção por nível (projeto, tarefa, sessão): sem limite ou um valor rígido, com aviso suave em 80%. Valores definidos fora do painel continuam selecionáveis.
+- Opções travadas pela política global mostram `[origem: política global]` e nunca são gravadas pelo painel.
 
 ~~~text
 /cost now
@@ -155,9 +169,9 @@ A extensão mantém o ledger e a configuração do projeto localmente. Nas verif
 
 - Se o total mostrar preço desconhecido, confira os metadados de preço do modelo ou adicione um modelo local confirmado com /cost local add provider/model; valores desconhecidos não são tratados como gratuitos.
 - Se as configurações do projeto não forem aplicadas, verifique se o Pi confia no projeto e confira .pi/pi-suite.yaml e as configurações globais em locked.
-- Execute npm test para a suíte unitária e npm run smoke para o smoke do painel. O smoke usa dados sintéticos de ledger/estado com o loader e a TUI locais do Pi; não chama modelo nem provedor. O smoke aceito no CT52 usou Pi 1.4.0.
+- Execute npm test para a suíte unitária e npm run smoke para o smoke do painel. O smoke monta uma cópia instalada do pacote, carrega-a com o loader da versão instalada do Pi (padrão ~/.pi/agent/install/releases/1.6.0, ou PI_HOST_DIR) e conduz o painel com o pi-tui dessa versão; usa dados sintéticos de ledger/estado em diretórios temporários e não chama modelo nem provedor. Não substitui uma verificação manual num terminal real.
 - A extensão não cancela cobranças de provedores já iniciadas nem controla chamadas feitas por outras extensões.
 
 ### Licença
 
-O repositório não especifica atualmente uma licença para o código do produto.
+O repositório não especifica atualmente uma licença para o código do produto. O código de terceiros em vendor/ mantém a própria licença; veja vendor/THIRD_PARTY_NOTICES.md.

@@ -17,7 +17,7 @@ Use this specialization for work in the Pi Cost Profiler repository. The shared 
 ## User entry points
 
 - In a Pi TUI, /cost without arguments opens the dashboard; keep direct command forms available in clients without a custom screen.
-- Dashboard edits are drafts. Ctrl+S validates and saves; Esc returns from a submenu and the root warns before discarding a draft.
+- Dashboard edits are drafts. Ctrl+S validates and saves (the panel stays open); Esc in a field goes back without applying it, and at the root Esc warns about a draft and a second Esc discards it.
 - Preserve the documented commands for current spend, task/project reports, comparison, budget, export, reconcile, local model pricing, enable/disable and help.
 - Reconcile imports a user-selected local JSON file only after confirmation. Export is a report, not an invoice.
 
