@@ -12,7 +12,6 @@ import {
   safePath,
   atomicJson,
   redact,
-  merge,
 } from './lib/core.mjs';
 import {
   usageFields,
@@ -23,27 +22,10 @@ import {
   residualUsage,
 } from './ledger.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
-import {
-  FIELDS,
-  BUDGET_LEVELS,
-  BUDGET_AMOUNTS,
-  applyField,
-  fieldValues,
-  panelItems,
-  amountRows,
-  provideHost,
-  provideSettingsPanel,
-  host,
-} from './menu.mjs';
+import { FIELDS, applyField, fieldValues, provideSettingsPanel, host } from './menu.mjs';
+import { runCostPanel, routableModels } from './lib/panel.mjs';
 import { join } from 'node:path';
-import {
-  translate,
-  fieldDisplayValue,
-  localeName,
-  localeShell,
-  readProjectLocale,
-  writeProjectLocale,
-} from './lib/i18n.mjs';
+import { translate, readProjectLocale } from './lib/i18n.mjs';
 export const defaults = {
   costProfiler: {
     enabled: true,
@@ -67,10 +49,11 @@ export const defaults = {
   },
 };
 export default function profiler(pi, makeStream, injected = {}) {
-  // The entry point imported the host modules statically and hands them here; a lazy
-  // import inside the extension cannot resolve under pi's loader (see index.ts).
-  provideHost(injected.tui, injected.agent);
+  // The entry point imported the settings adapter statically and hands it here; a lazy
+  // import inside the extension cannot resolve host modules under pi's loader (see index.ts).
   provideSettingsPanel(injected.settingsPanel);
+  /** Open /cost panels: aborted and awaited on session shutdown. */
+  const openMenus = new Set();
   const rt = createRuntime(pi, 'cost', defaults),
     wrapped = new Map(),
     started = new Map(),
@@ -683,6 +666,8 @@ export default function profiler(pi, makeStream, injected = {}) {
     }
   });
   pi.on('session_shutdown', async () => {
+    for (const menu of openMenus) menu.abort.abort();
+    await Promise.allSettled([...openMenus].map((menu) => menu.running));
     unsub?.();
     for (const [id, old] of wrapped) {
       const current = rt.ctx?.modelRegistry.getRegisteredNativeProvider?.(id);
@@ -806,7 +791,9 @@ export default function profiler(pi, makeStream, injected = {}) {
   };
   const conf = () => rt.config.costProfiler;
   /* ------------------------------------------------------------------ *
-   *  Panel: state first, then the dials. One table (`FIELDS` in\n   *  menu.mjs) for both the screen and these commands.\n   *  ------------------------------------------------------------------ */
+   *  Panel state and the text commands. One table (`FIELDS` in menu.mjs) is used by
+   *  both the panel (lib/panel.mjs) and these commands.
+   * ------------------------------------------------------------------ */
 
   const windowFor = (rows, c, scope) => {
     const source = c.scope?.source ?? 'session';
@@ -876,10 +863,7 @@ export default function profiler(pi, makeStream, injected = {}) {
       limits,
       percent: Object.fromEntries(limits.map((b) => [b.scope, b.percent])),
       // Rule E: candidates come from the session's scope when it is not empty.
-      routable: (ctx.scopedModels ?? [])
-        .map((s) => `${s.model?.provider ?? 'openrouter'}/${s.model?.id}`)
-        .filter((id) => id.includes('/'))
-        .slice(0, 24),
+      routable: routableModels(ctx),
       localModels: models,
     };
   };
@@ -964,350 +948,41 @@ export default function profiler(pi, makeStream, injected = {}) {
     return note;
   };
 
+  /**
+   * The panel owns one AbortController per opening; session shutdown aborts it and waits for the
+   * panel (and any save or read it started) to finish before the runtime is disposed.
+   */
   const openMenu = async (ctx) => {
-    const preference = await readProjectLocale({ root: rt.root, trusted: ctx.isProjectTrusted() });
-    let savedLocale = preference.locale;
-    let draftLocale = savedLocale;
-    const tr = (key, values = {}) => translate(draftLocale, key, values);
-    let saved = structuredClone(conf());
-    let draft = structuredClone(saved);
-    let stateError = null;
-    let state;
-    try {
-      state = await panelState(ctx);
-    } catch (error) {
-      stateError = String(error?.message ?? error).split('\n')[0];
-      state = {
-        spendText: 'unknown', scopeLabel: 'scope unavailable', calls: 0, priced: 0,
-        unpriced: [], outside: 0, strict: true, percent: {}, routable: [],
-        limits: [], limitText: Object.keys(draft.budgets ?? {}).length ? 'configured' : 'none',
-      };
+    const openSettings = host.settingsPanel;
+    if (typeof openSettings !== 'function') return fallbackPanel(ctx, 'settings panel module is unavailable');
+    if (typeof ctx.ui?.custom !== 'function') return fallbackPanel(ctx, 'this client cannot show a custom screen');
+    if (openMenus.size) {
+      const { locale } = await readProjectLocale({ root: rt.root, trusted: ctx.isProjectTrusted() });
+      return output(ctx, translate(locale, 'reportAlreadyOpen'), 'warning');
     }
-    const locked = rt.config.locked?.costProfiler ?? {};
-    const items = [{ id: 'language' }, ...panelItems({ conf: saved, locked, state })];
-    const pendingNotes = new Map();
-    const savedNotes = [];
-    const savedFiles = new Set();
-    let savedChanges = 0;
-    let savedConfigChanges = 0;
-    const stable = (value) => {
-      if (Array.isArray(value)) return '[' + value.map(stable).join(',') + ']';
-      if (value && typeof value === 'object')
-        return '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + stable(value[key])).join(',') + '}';
-      return JSON.stringify(value);
-    };
-    const same = (left, right) => stable(left) === stable(right);
-    const dirty = () => !same(saved, draft) || savedLocale !== draftLocale;
-    const rowKeys = {
-      language: 'rowLanguage',
-      spend: 'rowSpend',
-      coverage: 'rowCoverage',
-      limits: 'rowLimits',
-      help: 'rowHelp',
-      budgetAmounts: 'rowBudgetAmounts',
-      budgets: 'rowBudgets',
-      localModels: 'rowLocalModels',
-      enabled: 'rowEnabled',
-      warnUnknownPricing: 'rowWarnUnknownPricing',
-      capOutput: 'rowCapOutput',
-      auditRequired: 'rowAuditRequired',
-      inputIncludesCache: 'rowInputIncludesCache',
-      maxRequestOutputTokens: 'rowMaxRequestOutputTokens',
-      priceCatalogTtlHours: 'rowPriceCatalogTtlHours',
-      localEnergyUsdPerHour: 'rowLocalEnergyUsdPerHour',
-      localDepreciationUsdPerHour: 'rowLocalDepreciationUsdPerHour',
-      opportunityUsdPerHour: 'rowOpportunityUsdPerHour',
-      scopeSource: 'rowScopeSource',
-      scopeStrict: 'rowScopeStrict',
-    };
-    const scopeName = (locale, level, id = '') => {
-      if (level === 'task') return translate(locale, 'scopeTask', { id }).trim();
-      if (level === 'project') return translate(locale, 'scopeProject');
-      return translate(locale, 'scopeSession');
-    };
-    const displayScope = () => {
-      const source = draft.scope?.source ?? 'session';
-      if (source === 'task') {
-        const id = String(state.scopeLabel ?? '').startsWith('task ')
-          ? String(state.scopeLabel).slice(5)
-          : '';
-        return scopeName(draftLocale, source, id || '—');
-      }
-      if (source === 'project') return scopeName(draftLocale, source);
-      if (stateError && state.scopeLabel === 'scope unavailable') return tr('scopeUnavailable');
-      return scopeName(draftLocale, 'session');
-    };
-    const limitValue = () => {
-      const configured = Object.entries(draft.budgets ?? {}).map(([level, budget]) => {
-        const live = (state.limits ?? []).find(
-          (item) => item.source !== 'command' && item.scope === level && item.hardUsd === budget.hardUsd,
-        );
-        return live
-          ? tr('valueLimitUsage', {
-              scope: `${scopeName(draftLocale, level)} · ${tr('sourceConfiguration')}`,
-              amount: Number(budget.hardUsd).toFixed(2),
-              percent: live.percent,
-            })
-          : tr('valueLimit', { scope: scopeName(draftLocale, level), amount: Number(budget.hardUsd).toFixed(2) });
-      });
-      const command = (state.limits ?? [])
-        .filter((item) => item.source === 'command')
-        .map((item) => tr('valueLimitUsage', {
-          scope: `${scopeName(draftLocale, item.scope)} · ${tr('sourceCommand')}`,
-          amount: Number(item.hardUsd).toFixed(2),
-          percent: item.percent,
-        }));
-      const entries = [...configured, ...command];
-      return entries.length ? entries.join(' · ') : tr('valueNone');
-    };
-    const displayValue = (item) => {
-      if (item.id === 'language') return localeName(draftLocale);
-      if (item.id === 'budgets') return tr('valueLimitCount', { count: Object.keys(draft.budgets ?? {}).length });
-      if (item.id === 'localModels') return tr('valueModelCount', { count: (draft.localModels ?? []).length });
-      if (FIELDS[item.id]) return fieldDisplayValue(draftLocale, item.id, FIELDS[item.id].current(draft));
-      if (item.id === 'spend') return state.spendText;
-      if (item.id === 'coverage') return String(state.priced ?? 0) + '/' + String(state.calls ?? 0);
-      if (item.id === 'limits') return limitValue();
-      return item.currentValue ?? '—';
-    };
-    const report = (panel, message) => panel.report(String(message));
-    const settingChangeText = (locale, id, value) => translate(locale, 'reportSettingChanged', {
-      field: translate(locale, rowKeys[id] ?? 'rowHelp'),
-      value: fieldDisplayValue(locale, id, value),
-    });
-    const stage = (id, value, panel) => {
-      if (id === 'language') {
-        draftLocale = value;
-        report(panel, tr('reportDraftUpdated'));
-        return;
-      }
-      const { patch } = applyField(draft, id, value, { locked, state });
-      draft = id === 'budgets' ? { ...draft, budgets: patch.budgets } : merge(draft, patch);
-      const field = FIELDS[id];
-      const unchanged = field.kind === 'list'
-        ? same(saved[field.listKey], draft[field.listKey])
-        : same(field.current(saved), field.current(draft));
-      if (unchanged) pendingNotes.delete(id);
-      else pendingNotes.set(id, value);
-      report(panel, dirty() ? tr('reportDraftUpdated') : tr('reportNoChanges'));
-    };
-    const budgetChoices = () => {
-      const rows = [];
-      for (const [level, budget] of Object.entries(draft.budgets ?? {})) {
-        rows.push({
-          value: 'edit:' + level,
-          label: tr('choiceEditBudget', { scope: scopeName(draftLocale, level), amount: Number(budget.hardUsd).toFixed(2) }),
-        });
-        rows.push({ value: 'remove:' + level, label: tr('choiceRemoveBudget', { scope: scopeName(draftLocale, level) }) });
-      }
-      BUDGET_LEVELS.forEach((level, index) => {
-        if (Object.hasOwn(draft.budgets ?? {}, level.value)) return;
-        const recommend = index === 0 && !Object.keys(draft.budgets ?? {}).length;
-        rows.push({
-          value: 'new:' + level.value,
-          label: tr('choiceSetBudget', { prefix: recommend ? tr('prefixRecommended') : '', scope: scopeName(draftLocale, level.value) }),
-        });
-      });
-      return rows;
-    };
-    const chooseBudget = async (panel, signal, currentLevel = 'project', askLevel = true) => {
-      let level = currentLevel;
-      if (askLevel) {
-        const chosenLevel = await panel.choose(tr('dialogBudgets'), budgetChoices(), undefined);
-        if (!chosenLevel || signal.aborted) return;
-        if (chosenLevel.startsWith('remove:')) {
-          stage('budgets', chosenLevel, panel);
-          return;
-        }
-        level = chosenLevel.slice(chosenLevel.indexOf(':') + 1);
-      }
-      const current = draft.budgets?.[level]?.hardUsd;
-      const choices = amountRows(level, draft).map((row, index) => {
-        const amount = row.value.split(':').at(-1);
-        const recommend = index === 0;
-        const selected = current != null && Number(current).toFixed(2) === amount;
-        const label = tr('choiceBudgetAmount', {
-          prefix: recommend ? tr('prefixRecommended') : '',
-          scope: scopeName(draftLocale, level),
-          amount,
-        }) + (selected ? tr('choiceCurrent') : '');
-        return { value: row.value, label };
-      });
-      const selected = await panel.choose(
-        tr('dialogBudgetAmount', { scope: scopeName(draftLocale, level) }),
-        choices,
-        current == null ? undefined : 'set:' + level + ':' + Number(current).toFixed(2),
-      );
-      if (selected && !signal.aborted) stage('budgets', selected, panel);
-    };
-    const modelChoices = () => fieldValues('localModels', draft, state).map((value, index) => ({
-      value,
-      label: value.startsWith('add:')
-        ? tr('choiceCountLocal', { prefix: index === 0 ? tr('prefixRecommended') : '', model: value.slice(4) })
-        : tr('choiceProviderPrice', { model: value.slice(7) }),
-    }));
-    const rows = items.map((item) => {
-      const id = item.id;
-      const labelKey = rowKeys[id];
-      const descriptionKey = labelKey + 'Description';
-      return {
-        id,
-        get label() { return tr(labelKey); },
-        get description() {
-          let value = tr(descriptionKey);
-          if (id === 'language') {
-            if (!preference.canPersist) value += ' ' + tr('languageTrustRequired');
-            else if (preference.issue === 'invalid') value += ' ' + tr('languageInvalid');
-            else if (preference.issue === 'unreadable') value += ' ' + tr('languageUnreadable');
-          }
-          return value;
-        },
-        value: () => displayValue(item),
-        activate: async (panel, signal) => {
-          if (signal.aborted) return;
-          if (id === 'language') {
-            const choices = [
-              { value: 'en', label: translate(draftLocale, 'localeEnglish') },
-              { value: 'pt-BR', label: translate(draftLocale, 'localePortuguese') },
-            ];
-            const selected = await panel.choose(tr('languageTitle'), choices, draftLocale);
-            if (selected && !signal.aborted) stage('language', selected, panel);
-            return;
-          }
-          if (id === 'spend') {
-            report(panel, stateError
-              ? tr('reportSpendUnavailable', { error: redact(stateError).split('\n')[0] })
-              : tr('reportSpend', { scope: displayScope(), spend: state.spendText, calls: state.calls }));
-            return;
-          }
-          if (id === 'coverage') {
-            const unknown = (state.unpriced ?? []).map((row) => row.model).join(', ');
-            report(panel, unknown
-              ? tr('reportCoverageUnknown', { priced: state.priced, calls: state.calls, models: unknown })
-              : tr('reportCoverage', { priced: state.priced, calls: state.calls }));
-            return;
-          }
-          if (id === 'limits') {
-            report(panel, tr('reportLimits', {
-              limits: limitValue(),
-              tokens: draft.maxRequestOutputTokens,
-              cap: fieldDisplayValue(draftLocale, 'capOutput', draft.capOutput ? 'on' : 'off'),
-            }));
-            return;
-          }
-          if (id === 'help') {
-            report(panel, tr('reportHelp'));
-            return;
-          }
-          if (id === 'budgets') return chooseBudget(panel, signal);
-          if (id === 'budgetAmounts') return chooseBudget(panel, signal, 'project', false);
-          if (id === 'localModels') {
-            const choices = modelChoices();
-            if (!choices.length) {
-              report(panel, tr('reportNoLocalModels'));
-              return;
-            }
-            const selected = await panel.choose(tr('dialogLocalModels'), choices);
-            if (selected && selected !== 'noop' && !signal.aborted) stage('localModels', selected, panel);
-            return;
-          }
-          const choices = fieldValues(id, draft, state).map((value) => ({
-            value,
-            label: fieldDisplayValue(draftLocale, id, value),
-          }));
-          const selected = await panel.choose(tr(labelKey), choices, FIELDS[id]?.current(draft));
-          if (selected !== undefined && !signal.aborted) stage(id, selected, panel);
-        },
-      };
-    });
     const abort = new AbortController();
-    const openPanel = host.settingsPanel;
-    if (typeof openPanel !== 'function') return fallbackPanel(ctx, 'settings panel module is unavailable');
+    const running = runCostPanel({ ctx, rt, openSettings, signal: abort.signal, panelState });
+    const entry = { abort, running };
+    openMenus.add(entry);
+    let outcome;
     try {
-      await openPanel(ctx.ui, {
-        title: () => tr('title'),
-        summary: () => tr('summary', {
-          accounting: tr(draft.enabled ? 'accountingOn' : 'accountingOff'),
-          spend: state.spendText,
-          coverage: String(state.priced ?? 0) + '/' + String(state.calls ?? 0),
-          scope: displayScope(),
-          unavailable: stateError ? tr('summaryUnavailable') : '',
-        }),
-        rows,
-        dirty,
-        shell: () => localeShell(draftLocale),
-        signal: abort.signal,
-        save: async (panel, signal) => {
-          if (signal.aborted) throw signal.reason ?? new Error('Operation canceled');
-          const configDirty = !same(saved, draft);
-          const localeDirty = savedLocale !== draftLocale;
-          if (!configDirty && !localeDirty) {
-            report(panel, tr('reportNoChanges'));
-            return;
-          }
-          let savedThisTime = 0;
-          if (configDirty) {
-            const patch = {};
-            const unset = [];
-            for (const key of new Set([...Object.keys(saved), ...Object.keys(draft)])) {
-              if (same(saved[key], draft[key])) continue;
-              if (!Object.hasOwn(draft, key)) unset.push([key]);
-              else patch[key] = draft[key];
-            }
-            if (same(saved.budgets, draft.budgets)) {
-              if (Object.hasOwn(patch, 'budgets')) delete patch.budgets;
-              for (let index = unset.length - 1; index >= 0; index--)
-                if (unset[index][0] === 'budgets') unset.splice(index, 1);
-            } else {
-              patch.budgets = draft.budgets ?? {};
-              for (const level of Object.keys(saved.budgets ?? {}))
-                if (!Object.hasOwn(draft.budgets ?? {}, level)) unset.push(['budgets', level]);
-            }
-            if (Object.keys(patch).length || unset.length) {
-              const changedCount = pendingNotes.size || Object.keys(patch).length;
-              await rt.save('costProfiler', patch, { unset, signal });
-              savedConfigChanges += changedCount;
-              savedChanges += changedCount;
-              savedThisTime += changedCount;
-              for (const [id, value] of pendingNotes)
-                savedNotes.push(settingChangeText(draftLocale, id, value));
-              savedFiles.add(rt.configFile);
-              saved = structuredClone(draft);
-              pendingNotes.clear();
-            }
-          }
-          if (localeDirty) {
-            if (!preference.canPersist || !ctx.isProjectTrusted() || !rt.root)
-              throw new Error(tr('languageTrustRequired'));
-            if (signal.aborted) throw signal.reason ?? new Error('Operation canceled');
-            const file = await writeProjectLocale({ root: rt.root, trusted: ctx.isProjectTrusted(), locale: draftLocale, signal });
-            savedLocale = draftLocale;
-            savedChanges += 1;
-            savedThisTime += 1;
-            savedNotes.push(tr('reportLanguageSaved', { language: localeName(savedLocale) }));
-            savedFiles.add(file);
-          }
-          if (savedThisTime) report(panel, tr('reportSaved', { count: savedThisTime }));
-          else report(panel, tr('reportNoChanges'));
-        },
-        formatError: (error) => tr('reportSaveFailed', {
-          error: redact(String(error?.message ?? error)).split('\n')[0],
-        }),
-      });
+      outcome = await running;
     } catch (error) {
-      return fallbackPanel(ctx, String(error?.message ?? error));
+      outcome = { status: 'failed', message: String(error?.message ?? error) };
     } finally {
-      abort.abort();
+      openMenus.delete(entry);
     }
+    if (outcome.status === 'failed') return fallbackPanel(ctx, outcome.message);
+    if (abort.signal.aborted) return undefined;
     return output(
       ctx,
-      savedChanges
-        ? translate(savedLocale, 'reportExitSaved', {
-          count: savedChanges,
-          notes: savedNotes.map((note) => '· ' + note).join('\n'),
-          file: [...savedFiles].join(' · '),
-        })
-        : translate(savedLocale, 'reportExitNoChanges'),
+      outcome.notes.length
+        ? translate(outcome.locale, 'reportExitSaved', {
+            count: outcome.notes.length,
+            notes: outcome.notes.map((note) => '· ' + note).join('\n'),
+            file: outcome.files.join(' · '),
+          })
+        : translate(outcome.locale, 'reportExitNoChanges'),
     );
   };
   // Text aliases that go through the same table the panel writes with.
