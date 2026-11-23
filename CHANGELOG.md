@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Open source
+
+- Added `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and pull request templates, and `SECURITY.md` with private vulnerability reporting.
+- README reorganized with the same sections in English and Brazilian Portuguese.
+- The project is now licensed under MIT (`LICENSE`); `package.json` declares `license`, `repository`, `bugs` and `homepage`.
+
 The version in package.json is unchanged; nothing was published.
 
 ### Changed

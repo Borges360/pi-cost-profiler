@@ -1,0 +1,50 @@
+name: Bug report / Relato de bug
+description: Something does not work as documented. / Algo não funciona como documentado.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems go to SECURITY.md, not here. Remove tokens, keys and personal paths from everything you paste.
+        Problemas de segurança vão para o SECURITY.md, não aqui. Remova tokens, chaves e caminhos pessoais de tudo o que colar.
+  - type: input
+    id: version
+    attributes:
+      label: Extension version or commit / Versão ou commit da extensão
+      placeholder: 0.0.0 or/ou abc1234
+    validations:
+      required: true
+  - type: input
+    id: pi
+    attributes:
+      label: Pi version / Versão do Pi
+      placeholder: "1.6.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS, terminal and Node.js / Sistema, terminal e Node.js
+      placeholder: Windows 11, Windows Terminal, Node 22.19
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Passos para reproduzir
+      placeholder: |
+        1. Run /cost
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior / Comportamento esperado e o que aconteceu
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Output of `/cost now` / Saída de `/cost now`
+      render: text

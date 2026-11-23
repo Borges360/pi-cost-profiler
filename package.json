@@ -1,6 +1,15 @@
 {
   "name": "pi-cost-profiler",
   "version": "0.3.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Borges360/pi-cost-profiler.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Borges360/pi-cost-profiler/issues"
+  },
+  "homepage": "https://github.com/Borges360/pi-cost-profiler#readme",
   "private": true,
   "type": "module",
   "engines": {

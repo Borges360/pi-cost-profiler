@@ -1,0 +1,22 @@
+name: Feature request / Pedido de melhoria
+description: Propose a change in behavior. / Proponha uma mudança de comportamento.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Problema
+      description: What are you trying to do, and what gets in the way? / O que você quer fazer e o que impede?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal / Proposta
+      description: The behavior you expect, including the menu or command involved. / O comportamento esperado, incluindo o menu ou comando envolvido.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered / Alternativas consideradas
