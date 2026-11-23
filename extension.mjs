@@ -25,7 +25,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { FIELDS, applyField, fieldValues, provideSettingsPanel, host } from './menu.mjs';
 import { runCostPanel, routableModels } from './lib/panel.mjs';
 import { join } from 'node:path';
-import { translate, readProjectLocale } from './lib/i18n.mjs';
+import { translate, readProjectLocale, fieldDisplayValue } from './lib/i18n.mjs';
 export const defaults = {
   costProfiler: {
     enabled: true,
@@ -857,9 +857,6 @@ export default function profiler(pi, makeStream, injected = {}) {
       unpriced: [...new Set(unpriced.map((r) => r.modelId))].map((model) => ({ model })),
       outside: (win.outside ?? []).length,
       strict: c.scope?.strict !== false,
-      limitText: limits.length
-        ? limits.map((b) => `${b.scope} $${Number(b.hardUsd).toFixed(2)} (${b.source})`).join(', ')
-        : 'nenhum',
       limits,
       percent: Object.fromEntries(limits.map((b) => [b.scope, b.percent])),
       // Rule E: candidates come from the session's scope when it is not empty.
@@ -868,31 +865,80 @@ export default function profiler(pi, makeStream, injected = {}) {
     };
   };
 
-  const stateLines = async (ctx) => {
+  /** The state summary of the degraded `/cost`, in the project's saved language (English by default). */
+  const stateLines = async (ctx, locale) => {
     const c = conf();
     const s = await panelState(ctx);
+    const tr = (key, values) => translate(locale, key, values);
+    const scopeText = (level, label = '') => {
+      if (level === 'task') return tr('scopeTask', { id: label.startsWith('task ') ? label.slice(5) : '—' }).trim();
+      return tr(level === 'project' ? 'scopeProject' : 'scopeSession');
+    };
+    const sources = { command: 'sourceCommand', configuration: 'sourceConfiguration', 'locked policy': 'sourceLockedPolicy' };
+    const onOff = (on) => fieldDisplayValue(locale, '', on ? 'on' : 'off');
+    const limits = s.limits.length
+      ? s.limits
+          .map((b) =>
+            tr('fallbackLimit', {
+              scope: scopeText(b.scope),
+              amount: Number(b.hardUsd).toFixed(2),
+              source: tr(sources[b.source] ?? 'sourceConfiguration'),
+            }),
+          )
+          .join(', ')
+      : tr('valueNone');
     return [
-      `Cost · ${c.enabled ? 'ON' : 'off'} · ${s.scopeLabel}: ${s.spendText} · ${s.calls} chamada(s)`,
-      `cobertura de preço: ${s.priced}/${s.calls}${s.unpriced.length ? ` · sem preço: ${s.unpriced.map((u) => u.model).join(', ')}` : ''}`,
-      `limites ativos: ${s.limitText} · teto de saída ${c.maxRequestOutputTokens} tokens (cap ${c.capOutput === true ? 'on' : 'off'})`,
-      `escopo ${c.scope?.source ?? 'session'} (strict ${c.scope?.strict === false ? 'off' : 'on'}) · ${s.outside ?? 0} chamada(s) fora da janela`,
-      `catálogo de preços revalida a cada ${c.priceCatalogTtlHours}h · locais: ${(c.localModels ?? []).length} modelo(s) · $/h: energia ${c.localEnergyUsdPerHour}, depreciação ${c.localDepreciationUsdPerHour}, oportunidade ${c.opportunityUsdPerHour}`,
+      tr('fallbackSpend', {
+        accounting: tr(c.enabled ? 'accountingOn' : 'accountingOff'),
+        scope: scopeText(c.scope?.source ?? 'session', String(s.scopeLabel ?? '')),
+        spend: s.spendText,
+        calls: s.calls,
+      }),
+      tr('fallbackCoverage', {
+        priced: s.priced,
+        calls: s.calls,
+        unknown: s.unpriced.length ? tr('fallbackUnknown', { models: s.unpriced.map((u) => u.model).join(', ') }) : '',
+      }),
+      tr('fallbackLimits', { limits, tokens: c.maxRequestOutputTokens, cap: onOff(c.capOutput === true) }),
+      tr('fallbackScope', {
+        scope: scopeText(c.scope?.source ?? 'session', String(s.scopeLabel ?? '')),
+        strict: onOff(c.scope?.strict !== false),
+        outside: s.outside ?? 0,
+      }),
+      tr('fallbackCatalog', {
+        hours: c.priceCatalogTtlHours,
+        models: (c.localModels ?? []).length,
+        energy: c.localEnergyUsdPerHour,
+        depreciation: c.localDepreciationUsdPerHour,
+        opportunity: c.opportunityUsdPerHour,
+      }),
     ];
   };
 
+  /**
+   * Degraded `/cost`: state summary plus the direct commands. `reason` is a catalog key of this
+   * extension (`fallbackReason…`) or text already in the panel's language (the adapter's message).
+   */
   const fallbackPanel = async (ctx, reason) => {
+    let locale = 'en';
+    try {
+      const trusted = typeof ctx.isProjectTrusted === 'function' ? ctx.isProjectTrusted() : false;
+      ({ locale } = await readProjectLocale({ root: rt.root, trusted }));
+    } catch {}
     let lines;
     try {
-      lines = await stateLines(ctx);
+      lines = await stateLines(ctx, locale);
     } catch {
-      lines = ['Cost · summary unavailable; configuration commands remain available.'];
+      lines = [translate(locale, 'fallbackSummaryUnavailable')];
     }
+    const why = reason?.startsWith?.('fallbackReason') ? translate(locale, reason) : reason;
     return output(ctx, [
       ...lines,
       '',
-      reason ? `Interactive panel unavailable: ${redact(String(reason)).split('\n')[0]}` : 'This client has no custom screen; direct commands remain available:',
-      '/cost now | task ID | project | compare | budget LEVEL N USD | export | reconcile',
-      '/cost cap on | audit on | scope task | local add <modelo> | limits 4096',
+      why
+        ? translate(locale, 'fallbackPanelUnavailable', { reason: redact(String(why)).split('\n')[0] })
+        : translate(locale, 'fallbackNoCustomScreen'),
+      translate(locale, 'fallbackCommands'),
     ].join('\n'));
   };
 
@@ -954,8 +1000,8 @@ export default function profiler(pi, makeStream, injected = {}) {
    */
   const openMenu = async (ctx) => {
     const openSettings = host.settingsPanel;
-    if (typeof openSettings !== 'function') return fallbackPanel(ctx, 'settings panel module is unavailable');
-    if (typeof ctx.ui?.custom !== 'function') return fallbackPanel(ctx, 'this client cannot show a custom screen');
+    if (typeof openSettings !== 'function') return fallbackPanel(ctx, 'fallbackReasonNoModule');
+    if (typeof ctx.ui?.custom !== 'function') return fallbackPanel(ctx, 'fallbackReasonNoCustom');
     if (openMenus.size) {
       const { locale } = await readProjectLocale({ root: rt.root, trusted: ctx.isProjectTrusted() });
       return output(ctx, translate(locale, 'reportAlreadyOpen'), 'warning');

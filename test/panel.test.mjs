@@ -570,7 +570,30 @@ test('an unavailable settings panel degrades to direct commands and a state summ
   assert.match(env.f.notifications.join('\n'), /Interactive panel unavailable.*settings panel module is unavailable/);
   const fallback = text(env);
   assert.match(fallback, /Cost ·/);
-  assert.ok(fallback.indexOf('cobertura de preço') < fallback.indexOf('/cost now'), 'state precedes command syntax');
+  assert.ok(fallback.indexOf('Price coverage') >= 0, 'state summary present');
+  assert.ok(fallback.indexOf('Price coverage') < fallback.indexOf('/cost now'), 'state precedes command syntax');
+});
+
+test('the degraded /cost follows the saved language: English has no Portuguese, pt-BR no English header', async (t) => {
+  const env = await costEnv(t);
+  await env.command('budget session 0.5 USD');
+  host.settingsPanel = undefined;
+  await env.command('');
+  const english = text(env);
+  assert.match(english, /^Cost · Accounting on · session: \$0\.0000 · 0 call\(s\)$/m);
+  assert.match(english, /Active limits: session USD 0\.50 \(command\)/);
+  assert.match(english, /local add <model>/);
+  const leak = english.match(/chamada|cobertura|limites ativos|teto de saída|escopo|catálogo|sessão|projeto|nenhum|<modelo>/i);
+  assert.equal(leak, null, `Portuguese in the English fallback: ${leak?.[0]}`);
+
+  await writeFile(env.localePath, JSON.stringify({ schemaVersion: 1, locale: 'pt-BR' }));
+  await env.command('');
+  const portuguese = text(env);
+  assert.match(portuguese, /^Custos · Contabilidade ativa · sessão: \$0\.0000 · 0 chamada\(s\)$/m);
+  assert.match(portuguese, /Limites ativos: sessão USD 0\.50 \(comando\)/);
+  assert.match(portuguese, /Painel interativo indisponível: o módulo do painel de configurações não está disponível/);
+  const english2 = portuguese.match(/Interactive panel unavailable|Price coverage|Active limits|call\(s\)|<model>/);
+  assert.equal(english2, null, `English in the pt-BR fallback: ${english2?.[0]}`);
 });
 
 test('a host that cannot open the overlay degrades to the text summary', async (t) => {

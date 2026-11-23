@@ -31,6 +31,18 @@ The version in package.json is unchanged; nothing was published.
   devDependency for the panel tests; `engines.node` is `>=22.19.0` (required by pi-tui 1.6.0) and
   CI runs Node 22 and 24.
 
+### Fixed
+
+- A Ctrl+S that writes the settings and then fails (or is cancelled with Esc) while writing the
+  language no longer reports the whole draft as unsaved: the settings already written become the
+  saved baseline, only the language stays in the draft, and a second Esc discards only it.
+- A slow first state read no longer replaces a newer refresh (Enter on Spend, Price coverage or
+  Active limits) in the rows and the header.
+- The degraded `/cost` text (no panel module, no custom screen, overlay failure) follows the saved
+  language: English by default, pt-BR when chosen, without mixing the two.
+- The closing summary is rendered in the saved language, so its lines no longer mix the language
+  previewed at save time with the final one.
+
 ### Removed
 
 - The unused `runDashboard` screen, its host-export table and `test-support/fake-tui.mjs`.
