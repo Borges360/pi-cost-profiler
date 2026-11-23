@@ -82,7 +82,7 @@ The extension stores its ledger and project configuration locally. It does not s
 
 ### License
 
-The repository does not currently specify a license for the product code. The bundled INTEIRO mark has separate attribution and license terms in [docs/assets/INTEIRO-MARK-LICENSE.txt](docs/assets/INTEIRO-MARK-LICENSE.txt).
+The repository does not currently specify a license for the product code.
 
 ## Português (Brasil)
 
@@ -160,4 +160,4 @@ A extensão mantém o ledger e a configuração do projeto localmente. Nas verif
 
 ### Licença
 
-O repositório não especifica atualmente uma licença para o código do produto. A marca INTEIRO incluída tem atribuição e licença próprias em [docs/assets/INTEIRO-MARK-LICENSE.txt](docs/assets/INTEIRO-MARK-LICENSE.txt).
+O repositório não especifica atualmente uma licença para o código do produto.
