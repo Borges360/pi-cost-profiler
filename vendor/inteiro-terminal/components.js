@@ -1,4 +1,4 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/components.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/components.ts). Do not edit; see VENDOR.json.
 import { keyHints } from "./keyboard.js";
 import { resolveMessages } from "./i18n.js";
 import { cellWidth, pad, safeText, truncate, wrap } from "./text.js";
@@ -132,7 +132,40 @@ export function ActionBar(actions, focusedId, messages = PT()) {
         actions
             .map((a) => `${a.id === focusedId ? ">" : ""}[${a.label}]${a.disabled ? ` ${messages.unavailableShort(a.disabled)}` : ""}`)
             .join(" "),
-    ]);
+    ], 0, ["actions"]);
+}
+/**
+ * Splits a projected action-bar line (whole or wrapped) into buttons so a renderer can paint each one
+ * by role without changing the text: joining every `text` returns the line unchanged.
+ */
+export function actionSegments(line, actions, focusedId) {
+    const out = [];
+    const push = (seg) => {
+        const last = out[out.length - 1];
+        if (!seg.role && !seg.focused && last && !last.role && !last.focused)
+            last.text += seg.text;
+        else
+            out.push(seg);
+    };
+    let i = 0;
+    scan: while (i < line.length) {
+        for (const a of actions) {
+            const focused = a.id === focusedId;
+            const token = `${focused ? ">" : ""}[${a.label}]`;
+            if (line.startsWith(token, i)) {
+                push({
+                    text: token,
+                    role: a.disabled ? "muted" : (a.role ?? "choose"),
+                    ...(focused ? { focused: true } : {}),
+                });
+                i += token.length;
+                continue scan;
+            }
+        }
+        push({ text: line[i] });
+        i++;
+    }
+    return out;
 }
 export function KeyHints(bindings, actions, ascii = false) {
     return view([keyHints(bindings, actions, ascii ? " | " : " · ")], 0, [

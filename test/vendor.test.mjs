@@ -16,7 +16,7 @@ test('vendored terminal adapter matches its manifest hashes (no IDS checkout nee
   assert.equal(result.ok, true);
   const m = result.manifest;
   assert.equal(m.package, '@inteiro/terminal');
-  assert.equal(m.version, '1.4.0');
+  assert.equal(m.version, '2.0.0-rc.1');
   assert.equal(m.format, 'js', 'plain ESM: Node 22/24 run it without type stripping or a build');
   assert.equal(m.source.dirty, false);
   assert.deepEqual(m.patches, [], 'the copy is identical to upstream');

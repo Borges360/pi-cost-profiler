@@ -1,4 +1,4 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/navigation.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/navigation.ts). Do not edit; see VENDOR.json.
 export class Navigation {
     history = [];
     current;

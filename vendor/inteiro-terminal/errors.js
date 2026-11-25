@@ -1,4 +1,4 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/errors.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/errors.ts). Do not edit; see VENDOR.json.
 /** Cancellation acknowledged by the work: `OperationCancelled`, `AbortError` or `code: "CANCELLED"`. */
 export function isCancellation(error) {
     if (!error || typeof error !== "object")

@@ -1,4 +1,4 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/settings.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/settings.ts). Do not edit; see VENDOR.json.
 import { normalizeLocale, resolveMessages, } from "./i18n.js";
 import { formatProductError, isCancellation, } from "./errors.js";
 const clone = (value) => structuredClone(value);

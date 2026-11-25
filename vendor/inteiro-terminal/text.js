@@ -1,4 +1,4 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/text.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/text.ts). Do not edit; see VENDOR.json.
 /** Strip OSC/DCS/APC/CSI (7/8 bit), then all controls. External text is never ANSI. */
 export function safeText(value) {
     return String(value ?? "")

@@ -1,4 +1,4 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/workspace.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/workspace.ts). Do not edit; see VENDOR.json.
 import { Navigation } from "./navigation.js";
 import { normalizeLocale, resolveMessages, } from "./i18n.js";
 import { DataTable, DetailView, LogModel, LogView, ResultList, TableModel, TerminalPanel, ActionBar, } from "./components.js";
@@ -62,6 +62,17 @@ export class WorkspaceModel {
             this.log.paused ? m.workspaceResumeLogs : m.workspacePauseLogs,
             m.workspaceClose,
         ];
+    }
+    /** Action-bar buttons; all navigate or switch views, so they take the `choose` role. */
+    get barActions() {
+        return this.actions.map((label, i) => ({
+            id: String(i),
+            label,
+            role: "choose",
+        }));
+    }
+    get focusedActionId() {
+        return this.region === "actions" ? String(this.actionIndex) : undefined;
     }
     dispatch(action) {
         if (action === "back" || action === "close") {
@@ -138,7 +149,7 @@ export class WorkspaceModel {
             body,
             help: this.help ?? m.workspaceHelp,
             feedback: "",
-            actions: ActionBar(this.actions.map((label, i) => ({ id: String(i), label })), this.region === "actions" ? String(this.actionIndex) : undefined, m),
+            actions: ActionBar(this.barActions, this.focusedActionId, m),
             hints: {
                 lines: [this.hints ?? m.workspaceHints],
                 fullText: [],

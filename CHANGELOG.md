@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Terminal adapter
+
+- The vendored adapter moves to `@inteiro/terminal` 2.0.0-rc.1 (`6a1bd7d`). The focused row gets the host selection background (`selectedBg`) across the width; Save is painted as a real effect (`bashMode`, bold) and the other buttons as choices (`accent`); the empty search line no longer appears above the list and only shows while a filter is active.
+
 ### Open source
 
 - Added `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and pull request templates, and `SECURITY.md` with private vulnerability reporting.

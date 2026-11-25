@@ -1,4 +1,4 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/controller.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/controller.ts). Do not edit; see VENDOR.json.
 import { SettingsSession } from "./settings.js";
 import { Navigation } from "./navigation.js";
 import { Operation } from "./operation.js";
@@ -98,6 +98,7 @@ export class PanelController {
         return [
             {
                 id: "save",
+                role: "commit",
                 label: reconcile
                     ? this.messages.actionReconcile
                     : this.messages.actionSave,
@@ -106,15 +107,24 @@ export class PanelController {
                 ? [
                     {
                         id: "run",
+                        role: this.task.effect === "external" && !this.operation.active
+                            ? "commit"
+                            : "choose",
                         label: this.operation.active
                             ? this.messages.actionCancelOperation
                             : this.task.label,
                     },
                 ]
                 : []),
-            { id: "help", label: this.messages.actionHelp },
-            { id: "close", label: this.messages.actionClose },
+            { id: "help", role: "choose", label: this.messages.actionHelp },
+            { id: "close", role: "choose", label: this.messages.actionClose },
         ];
+    }
+    /** Id of the focused action-bar button, when the action region has focus. */
+    get focusedActionId() {
+        return this.region === "actions"
+            ? this.actions[this.actionIndex]?.id
+            : undefined;
     }
     /** Running operation (bar task, action row, choice loading or storage check), if any. */
     get activeOperation() {
@@ -665,7 +675,18 @@ export class PanelController {
                 fullText: [m.noSearchResults],
                 kinds: ["muted"],
             };
-        if (this.navigation.searchable)
+        // Standard (host) presentation: the search line only appears while a filter is active; the
+        // hint line already offers the search key. Legacy keeps the 1.3 output.
+        if (this.navigation.searchable && this.presentation === "standard") {
+            if (this.search)
+                body = {
+                    lines: [`${m.searchItems}: ${this.search}`, ...body.lines],
+                    focusedLine: body.focusedLine + 1,
+                    fullText: [`${m.searchItems}: ${this.search}`, ...body.fullText],
+                    kinds: ["muted", ...(body.kinds ?? [])],
+                };
+        }
+        else if (this.navigation.searchable)
             body = {
                 lines: [`[${m.searchItems}] ${this.search}`, ...body.lines],
                 focusedLine: body.focusedLine + 1,
@@ -849,9 +870,7 @@ export class PanelController {
             help: this.help ? "" : this.focusedDescription(),
             feedback: feedback.text,
             ...(feedback.kind ? { feedbackKind: feedback.kind } : {}),
-            actions: ActionBar(this.actions, this.region === "actions"
-                ? this.actions[this.actionIndex]?.id
-                : undefined, m),
+            actions: ActionBar(this.actions, this.focusedActionId, m),
             hints: this.hints(ascii),
             columns,
             rows,

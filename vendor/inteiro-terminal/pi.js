@@ -1,7 +1,8 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/pi.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/pi.ts). Do not edit; see VENDOR.json.
 import { Input, matchesKey, truncateToWidth, visibleWidth, } from "@earendil-works/pi-tui";
 import { keyAction, keyLabel, resolveBindingsLenient, standardKeyHints, } from "./keyboard.js";
 import { PanelController, } from "./controller.js";
+import { actionSegments, } from "./components.js";
 import { setCellWidthMeasure } from "./text.js";
 import { resolveMessages, } from "./i18n.js";
 import { WorkspaceModel } from "./workspace.js";
@@ -32,11 +33,38 @@ export function piBindings(keys, reserved = [], ctrlS = true, options = {}) {
     })));
     return resolveBindingsLenient(host, reserved, ctrlS, options);
 }
-/** Paints semantic line kinds with the host theme only; no fixed ANSI. */
-function paint(theme, kind, line) {
+const selected = (theme, text) => theme.bg ? theme.bg("selectedBg", text) : text;
+function paintButton(theme, role, text) {
+    switch (role) {
+        case "commit": {
+            const colored = theme.fg("bashMode", text);
+            return theme.bold ? theme.bold(colored) : colored;
+        }
+        case "choose":
+            return theme.fg("accent", text);
+        case "muted":
+            return theme.fg("muted", text);
+        default:
+            return text;
+    }
+}
+/**
+ * Paints semantic line kinds with the host theme only; no fixed ANSI. The focused row is marked by
+ * `>` and by the host selection background across the whole width, not by color alone.
+ */
+function paint(theme, kind, line, width, bar) {
     switch (kind) {
         case "focus":
-            return theme.fg("accent", line);
+            return selected(theme, theme.fg("accent", line + " ".repeat(Math.max(0, width - visibleWidth(line)))));
+        case "actions":
+            if (!bar)
+                return line;
+            return actionSegments(line, bar.actions, bar.focusedId)
+                .map((s) => {
+                const painted = paintButton(theme, s.role, s.text);
+                return s.focused ? selected(theme, painted) : painted;
+            })
+                .join("");
         case "error":
             return theme.fg("error", line);
         case "warning":
@@ -246,9 +274,10 @@ export class PiSettingsPanel {
                 }
             }
         }
+        const bar = { actions: c.actions, focusedId: c.focusedActionId };
         return lines
             .slice(0, rows)
-            .map((line, i) => paint(this.theme, kinds[i], fit(line, width)));
+            .map((line, i) => paint(this.theme, kinds[i], fit(line, width), width, bar));
     }
     async drain() {
         await Promise.all([...this.pending]);
@@ -394,7 +423,10 @@ export async function openPiWorkspace(ui, model, signal, reservedKeysOrOptions =
                 render(columns) {
                     const width = Math.max(1, Math.floor(columns));
                     const frame = model.render(width, overlayRows(tui.terminal?.rows ?? 24, overlay));
-                    return frame.lines.map((l, i) => paint(theme, frame.kinds?.[i], fit(l, width)));
+                    return frame.lines.map((l, i) => paint(theme, frame.kinds?.[i], fit(l, width), width, {
+                        actions: model.barActions,
+                        focusedId: model.focusedActionId,
+                    }));
                 },
                 handleInput(data) {
                     if (closed ||

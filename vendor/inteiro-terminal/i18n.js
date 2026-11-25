@@ -1,4 +1,4 @@
-// Vendored from @inteiro/terminal 1.4.0 (packages/terminal/src/i18n.ts). Do not edit; see VENDOR.json.
+// Vendored from @inteiro/terminal 2.0.0-rc.1 (packages/terminal/src/i18n.ts). Do not edit; see VENDOR.json.
 export const DEFAULT_LOCALE = "pt-BR";
 export const LOCALES = ["en", "pt-BR"];
 const pt = {
