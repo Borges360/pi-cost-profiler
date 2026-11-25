@@ -8,9 +8,9 @@
   "source": {
     "repository": "https://github.com/Borges360/ids.git",
     "path": "packages/terminal/src",
-    "commit": "64348b946d713618893e559ca2dabb6799e481e3",
-    "packageCommit": "64348b946d713618893e559ca2dabb6799e481e3",
-    "date": "2026-11-25T10:12:22.000Z",
+    "commit": "b9073f6436246f7d23a0185a7420454b13ebda7a",
+    "packageCommit": "b9073f6436246f7d23a0185a7420454b13ebda7a",
+    "date": "2026-11-25T10:32:40.000Z",
     "dirty": false
   },
   "externals": [
@@ -80,8 +80,8 @@
     {
       "path": "pi-themes.js",
       "upstream": "packages/terminal/src/pi-themes.ts",
-      "upstreamSha256": "b452e7ddd13b29dda2e9b9e40d36e33b1f1cdce89340b261ffa1ff36cc1e8962",
-      "sha256": "2e7a591a61dc7d40cadc597115f53a931749ccaed2fef97c3c4657c150f60a2e"
+      "upstreamSha256": "bc8032ebf083c5897a5345eb9d019e92c4ac9571e7eca65f88ca4626dca842a7",
+      "sha256": "d63f45df39d04398823121b6a7113ab2cf2c21ad55fd48c6f6cb2a0895107d6c"
     },
     {
       "path": "pi.js",
