@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { openPiSettings } from './vendor/inteiro-terminal/pi.js';
+import { openPiSettings, registerInteiroPiThemes } from './vendor/inteiro-terminal/pi.js';
 import install from './extension.mjs';
 
 /**
@@ -18,5 +18,7 @@ import install from './extension.mjs';
  * the real host loader is exercised by the smoke.
  */
 export default function (pi: ExtensionAPI) {
+  // Makes the design-system Pi themes available in /settings: no separate install, never selects one.
+  registerInteiroPiThemes(pi);
   install(pi, undefined, { settingsPanel: openPiSettings });
 }

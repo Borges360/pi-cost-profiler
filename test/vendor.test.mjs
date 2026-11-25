@@ -22,7 +22,8 @@ test('vendored terminal adapter matches its manifest hashes (no IDS checkout nee
   assert.deepEqual(m.patches, [], 'the copy is identical to upstream');
   // Only the Pi host is external: no width library, no prompts/linear adapters.
   assert.deepEqual(m.externals, ['@earendil-works/pi-tui']);
-  assert.equal(m.files.length, 12);
+  // 12 adapter modules plus the theme data and its installer (pi-themes.js, pi-theme-install.js).
+  assert.equal(m.files.length, 14);
 });
 
 test('vendored copy carries no design-system tokens, palette or fixed colors', async () => {

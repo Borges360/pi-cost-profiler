@@ -6,6 +6,7 @@ import { actionSegments, } from "./components.js";
 import { setCellWidthMeasure } from "./text.js";
 import { resolveMessages, } from "./i18n.js";
 import { WorkspaceModel } from "./workspace.js";
+export { installInteiroPiThemes, registerInteiroPiThemes, piAgentDir, } from "./pi-theme-install.js";
 // Layout must measure exactly like the host renderer: pi-tui stops the TUI when a line is wider
 // than the terminal. The adapter therefore never depends on another width library.
 setCellWidthMeasure(visibleWidth);

@@ -90,6 +90,8 @@ costProfiler:
 
 Ledger collections are local JSONL files in the per-project state directory, `~/.pi/agent/pi-suite/projects/<project-id>/`. They hold accounting events: model and provider identifiers, usage, price snapshots, task and session identifiers, and cost outcomes. The extension is not a provider gateway and does not replace Pi's authentication or network controls.
 
+Themes: on load, the extension copies the color themes of its terminal adapter to `<agent-dir>/themes/`, so they are listed in `/settings` → **Theme**. It never changes the selected theme and never overwrites a theme file you edited. Set `PI_DESIGN_THEMES=off` to skip the copy.
+
 ### Language
 
 This README is available in English and Brazilian Portuguese. In a trusted Pi project, open `/cost` and choose **Language** to preview the panel in English or Português (Brasil). `Ctrl+S` stores the preference only in that project's `.pi/pi-cost-profiler.locale.json`. On first use, and when the value is missing or invalid, the panel uses English. `Esc` keeps the usual draft warning and discard behavior. Command names, IDs and configuration keys do not change.
@@ -201,6 +203,8 @@ costProfiler:
 ~~~
 
 As coleções do ledger são arquivos JSONL locais no diretório de estado por projeto, `~/.pi/agent/pi-suite/projects/<project-id>/`. Elas guardam eventos contábeis: identificadores de modelo e provedor, uso, snapshots de preço, IDs de tarefa e sessão e resultados de custo. A extensão não é um gateway de provedor e não substitui a autenticação nem os controles de rede do Pi.
+
+Temas: ao carregar, a extensão copia os temas de cores do seu adaptador de terminal para `<agent-dir>/themes/`, e eles aparecem em `/settings` → **Theme**. Ela nunca troca o tema escolhido nem sobrescreve um arquivo de tema que você editou. Defina `PI_DESIGN_THEMES=off` para não copiar.
 
 ### Idioma
 

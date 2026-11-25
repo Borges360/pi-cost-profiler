@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Themes
+
+- On load, the extension copies the terminal adapter's color themes to `<agent-dir>/themes/` and lists them in the running session, so they appear in `/settings` without a separate install. It never selects a theme or overwrites an edited one; `PI_DESIGN_THEMES=off` skips the copy.
+
 ### Terminal adapter
 
 - The vendored adapter moves to `@inteiro/terminal` 2.0.0-rc.1 (`6a1bd7d`). The focused row gets the host selection background (`selectedBg`) across the width; Save is painted as a real effect (`bashMode`, bold) and the other buttons as choices (`accent`); the empty search line no longer appears above the list and only shows while a filter is active.

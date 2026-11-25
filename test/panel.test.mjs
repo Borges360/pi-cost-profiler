@@ -616,7 +616,8 @@ test('localization leaves the /cost command and direct action identifiers unchan
 
 test('the pi entry point imports the settings adapter statically and hands it over', async () => {
   const entry = await readFile(new URL('../index.ts', import.meta.url), 'utf8');
-  assert.match(entry, /import \{ openPiSettings \} from ['"]\.\/vendor\/inteiro-terminal\/pi\.js['"]/);
+  assert.match(entry, /import \{ openPiSettings, registerInteiroPiThemes \} from ['"]\.\/vendor\/inteiro-terminal\/pi\.js['"]/);
+  assert.match(entry, /registerInteiroPiThemes\(pi\);\s+install\(/);
   assert.match(entry, /install\(pi, undefined, \{ settingsPanel: openPiSettings \}\)/);
   const extension = await readFile(new URL('../extension.mjs', import.meta.url), 'utf8');
   assert.match(extension, /provideSettingsPanel\(injected\.settingsPanel\)/);
