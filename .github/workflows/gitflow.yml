@@ -1,4 +1,4 @@
-# harness:managed gitflow v1 — workspace/templates/workflows/gitflow.yml
+# harness:managed gitflow v2 — workspace/templates/workflows/gitflow.yml
 # harness:gitflow-policy — contribuição: origem/destino do PR no Git Flow, Conventional
 # Commits e guarda de workflows. Deploy é exclusivamente pelo Jenkins (tarefa 06).
 name: gitflow-policy
@@ -32,16 +32,24 @@ jobs:
             main:release/*|main:hotfix/*) ;;
             *) echo "::error::$HEAD_REF -> $BASE_REF fora do Git Flow: feature/ -> develop; release/ e hotfix/ -> main e develop."; exit 1 ;;
           esac
-      - name: Commits do PR seguem Conventional Commits
-        if: github.event_name == 'pull_request'
+      - name: Commits seguem Conventional Commits
         env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          # PR aberto pela automação (gitflow-release) não dispara pull_request: no push e no
+          # dispatch a mesma regra vale para os commits da branch em relação ao destino.
+          if [ "$EVENT" != pull_request ]; then
+            case "$REF" in main|develop) exit 0 ;; release/*|hotfix/*) target=main ;; *) target=develop ;; esac
+            git fetch -q origin "+refs/heads/$target:refs/remotes/origin/$target" || exit 0
+            BASE_SHA=$(git merge-base HEAD "origin/$target"); HEAD_SHA=$(git rev-parse HEAD)
+          fi
           bad=0
           for sha in $(git rev-list --no-merges "$BASE_SHA..$HEAD_SHA"); do
             subject=$(git log -1 --format=%s "$sha")
-            if ! printf '%s\n' "$subject" | grep -Eq '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([A-Za-z0-9._/-]+\))?!?: .+'; then
+            if ! printf '%s\n' "$subject" | grep -Eq '^((feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|release)(\([A-Za-z0-9._/-]+\))?!?: .+|Revert ".+")$'; then
               echo "::error::commit $sha fora de Conventional Commits: $subject"; bad=1
             fi
           done
