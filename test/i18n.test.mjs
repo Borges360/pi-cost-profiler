@@ -21,7 +21,7 @@ const SAMPLE = {
   limits: 'project: hard limit USD 5.00', tokens: 2048, cap: 'On',
   error: 'sample error', field: 'Accounting', value: 'On',
   notes: '· Accounting updated to On', file: 'project/.pi/pi-suite.yaml',
-  language: 'Português (Brasil)',
+  language: 'Português (Brasil)', soft: '0.40',
 };
 
 test('English and pt-BR catalogs have identical keys and placeholders', () => {
@@ -32,10 +32,11 @@ test('English and pt-BR catalogs have identical keys and placeholders', () => {
 });
 
 test('first-use, invalid locale and missing-key fallback stay in English', () => {
-  assert.equal(translate(undefined, 'title'), 'Cost');
-  assert.equal(translate('not-a-locale', 'title'), 'Cost');
+  assert.equal(translate(undefined, 'title'), 'Cost / Settings');
+  assert.equal(translate('not-a-locale', 'title'), 'Cost / Settings');
   assert.equal(translate('pt-BR', 'notDefined'), 'notDefined');
-  assert.equal(translate('pt-BR', 'shellUnsaved'), 'Há alterações sem salvar. Ctrl+S salva; pressione Esc novamente para descartar.');
+  assert.equal(translate('pt-BR', 'title'), 'Custos / Configurações');
+  assert.equal(translate('pt-BR', 'reportSavedActive'), 'Alterações salvas. As configurações de custo estão ativas.');
 });
 
 test('localized dashboard copy wraps within 40, 80 and 120 columns', () => {

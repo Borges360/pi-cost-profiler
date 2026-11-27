@@ -37,7 +37,8 @@ O primeiro teste inicializa os cinco pacotes juntos no runtime real em RPC, sem 
 - MCP: autorização, trust, limites, precedência, URLs, stdio e nested calls testados localmente. Servidores remotos de produção não foram acionados.
 - MCPHub local: esquema `mcp_settings.json` confirmado por inspeção de metadados (`mcpServers`, 3 entradas). Adaptador de arquivo, com consentimento, sem supor uma API HTTP não verificada.
 - Benchmark: replay reproduzível de registros medidos fornecidos, não uma campanha paga com 60–100 tarefas. Não há alegação de economia medida.
-- CI Windows/Linux e Node 20/22/24: workflow criado; não executado remotamente nesta sessão.
+- CI Windows/Linux e Node 20/22/24: workflow criado; não executado remotamente nesta sessão. (Registro histórico da v0.2.0.)
+  - Nota de 23/11/2026: a matriz atual de `.github/workflows/test.yml` é Node 22/24. O Node 20 saiu porque o pi-tui 1.6.0 (devDependency dos testes do painel `/cost`) e o Pi 1.5.2/1.6.0 exigem Node >=22.19; `engines.node` passou a `>=22.19.0`. A matriz nova também não foi executada remotamente.
 - Verificadores Maven/Gradle/Go/infra dependem dos executáveis e contratos reais do projeto. Testes locais de processo/checkers usaram Node.
 
 ## Armazenamento
