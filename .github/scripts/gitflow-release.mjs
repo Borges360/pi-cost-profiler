@@ -96,6 +96,12 @@ export function topicTitle(commits, ref) {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Workflows do commit que rodam em pull_request (exceto este): quantos checks esperar. */
+function prWorkflows(git, sha) {
+  const names = (git.try("ls-tree", "--name-only", sha, ".github/workflows/") ?? "").split("\n").filter((f) => /\.ya?ml$/.test(f) && !f.endsWith("/release.yml"));
+  return names.filter((f) => /^\s*pull_request:/m.test(git.try("show", `${sha}:${f}`) ?? "")).length;
+}
+
 export async function run({ dir, ref, env = process.env, git = createGit(dir), api, log = console.log, sleep = wait }) {
   const cfg = loadConfig(dir);
   const onGitea = env.GITEA_ACTIONS === "true";
@@ -114,19 +120,20 @@ export async function run({ dir, ref, env = process.env, git = createGit(dir), a
     if (onGitea) return;
     const sha = (git.try("ls-remote", "--heads", "origin", branch) ?? "").split(/\s+/)[0];
     if (!sha) return;
-    for (let attempt = 0; attempt < 12; attempt += 1) {
+    // As execuções aparecem aos poucos: espera até aprovar um por workflow de PR (no máximo 2 min).
+    const expected = prWorkflows(git, sha);
+    const approved = new Set();
+    for (let attempt = 0; attempt < 24 && approved.size < expected; attempt += 1) {
       let runs;
       try { runs = await api.pendingRuns(sha); } catch (error) { act("checks-falhou", { reason: error.message }); return; }
-      if (runs.length) {
-        for (const r of runs) {
-          try { await api.approveRun(r.id); act("check-aprovado", { workflow: r.name, run: r.id }); }
-          catch (error) { act("check-aprovacao-negada", { workflow: r.name, reason: error.message }); }
-        }
-        return;
+      for (const r of runs.filter((x) => !approved.has(x.id))) {
+        approved.add(r.id);
+        try { await api.approveRun(r.id); act("check-aprovado", { workflow: r.name, run: r.id }); }
+        catch (error) { act("check-aprovacao-negada", { workflow: r.name, reason: error.message }); }
       }
-      await sleep(5000);
+      if (approved.size < expected) await sleep(5000);
     }
-    act("checks-sem-pendencia", { sha: sha.slice(0, 12) });
+    if (approved.size < expected) act("checks-incompletos", { sha: sha.slice(0, 12), approved: approved.size, expected });
   };
   const ensurePr = async (base, head, title, body, { refreshBody = false } = {}) => {
     const open = await api.openPulls();
