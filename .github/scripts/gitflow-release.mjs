@@ -8,6 +8,7 @@
 //   main                               → tag v<versão> + release com as notas e PR de retorno main → develop.
 // Nunca integra PR: o merge continua humano. Não faz deploy (Jenkins) nem publica pacote.
 // Distribuído pelo harness como .github/scripts/gitflow-release.mjs, ao lado de version.mjs.
+/* global process, console, setTimeout -- o ESLint dos produtos também lê .github/scripts */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
