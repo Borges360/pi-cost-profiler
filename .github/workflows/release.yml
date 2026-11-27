@@ -1,0 +1,37 @@
+# harness:managed release v1 — workspace/templates/workflows/release.yml
+# harness:gitflow-release — PR automático no Git Flow e versão semântica pelos Conventional
+# Commits (.github/scripts/gitflow-release.mjs + version.mjs, distribuídos pelo harness):
+#   feature/** e bugfix/** → PR para develop;
+#   develop → release/<versão> com o arquivo de versão e PR para main (feat = minor, fix/perf = patch, ! = major);
+#   hotfix/** → commit de versão (patch) e PR para main;
+#   main → tag v<versão>, release com as notas e PR de retorno para develop.
+# Nunca integra PR: o merge continua humano. Deploy é exclusivamente pelo Jenkins.
+name: gitflow-release
+
+on:
+  push:
+    branches: [main, develop, "feature/**", "bugfix/**", "codex/**", "release/**", "hotfix/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: gitflow-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: PR automático e versão por Conventional Commits
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITFLOW_REF: ${{ github.ref_name }}
+        run: node .github/scripts/gitflow-release.mjs

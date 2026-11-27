@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "git": {
+      "command": "python",
+      "args": [
+        "-m",
+        "uv",
+        "tool",
+        "run",
+        "--python",
+        "3.12",
+        "mcp-server-git",
+        "--repository",
+        "C:\\Users\\felip\\Desenvolvimento\\pi-cost-profiler"
+      ],
+      "cwd": "C:\\Users\\felip\\Desenvolvimento\\pi-cost-profiler",
+      "exposure": "deferred"
+    },
+    "development": {
+      "url": "https://mcphub.lab/mcp/workspace",
+      "exposure": "deferred",
+      "description": "MCPHub grupo workspace (Jenkins, design e metadados); OAuth nativo."
+    }
+  }
+}
